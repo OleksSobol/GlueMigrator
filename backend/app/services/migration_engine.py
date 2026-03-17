@@ -138,10 +138,26 @@ async def _migrate_item(db, job, item_type, resource, source_client, dest_client
             item.dest_resource_id = created["id"]
 
         elif item_type == "flexible_asset":
-            # Requires type ID mapping — skipped until Phase 5 (mapping config)
-            item.status = "skipped"
-            await db.commit()
-            return
+            if not job.mapping_config_id:
+                item.status = "skipped"
+                await db.commit()
+                return
+            mapping_config = await crud.get_mapping_config(db, job.mapping_config_id)
+            mappings = json.loads(mapping_config.mappings)
+            dest_type_id = mappings.get(resource.get("type_id") or resource.get("flexible_asset_type_id"))
+            if not dest_type_id:
+                item.status = "skipped"
+                await db.commit()
+                return
+            full = await source_client.get_flexible_asset(resource["id"])
+            payload = {"data": {"type": "flexible_assets", "attributes": {
+                "name": full["name"],
+                "flexible-asset-type-id": dest_type_id,
+                "organization-id": job.dest_org_id,
+                "traits": full.get("traits", {}),
+            }}}
+            created = await dest_client.create_flexible_asset(payload)
+            item.dest_resource_id = created["id"]
 
         item.status = "completed"
         job.completed_items += 1

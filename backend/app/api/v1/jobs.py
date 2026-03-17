@@ -1,8 +1,12 @@
+import json
 import asyncio
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from app.db.database import get_session
+
 from app.db import crud
+from pydantic import BaseModel
+from app.core.encryption import decrypt
+from app.db.database import get_session
+from fastapi import APIRouter, HTTPException
+from app.services.itglue_client import ITGlueClient
 from app.services.migration_engine import run_migration
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -87,3 +91,53 @@ async def start_job(job_id: str):
 
     asyncio.create_task(run_migration(job_id))
     return {"status": "queued"}
+
+
+@router.get("/{job_id}/asset-type-map")
+async def get_asset_type_map(job_id: str):
+    async with get_session() as db:
+        job = await crud.get_job(db, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        cred = await crud.get_credential(db, job.credential_id)
+
+    source_client = ITGlueClient(
+        api_key=decrypt(cred.source_api_key_enc),
+        base_url=cred.source_base_url,
+    )
+    dest_client = ITGlueClient(
+        api_key=decrypt(cred.dest_api_key_enc),
+        base_url=cred.dest_base_url,
+    )
+
+    source_types, dest_types = await asyncio.gather(
+        source_client.get_flexible_asset_types(),
+        dest_client.get_flexible_asset_types(),
+    )
+
+    return {
+        "source_types": source_types,
+        "dest_types": dest_types,
+    }
+
+
+class AssetTypeMapping(BaseModel):
+    mappings: dict[str, str]  # source_type_id -> dest_type_id
+
+
+@router.post("/{job_id}/asset-type-map")
+async def save_asset_type_map(job_id: str, body: AssetTypeMapping):
+    async with get_session() as db:
+        job = await crud.get_job(db, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        config = await crud.create_mapping_config(
+            db=db,
+            label=f"Asset type map for job {job_id}",
+            source_org_id=job.source_org_id,
+            dest_org_id=job.dest_org_id,
+            mappings=json.dumps(body.mappings),
+        )
+        job.mapping_config_id = config.id
+        await db.commit()
+    return {"mapping_config_id": config.id}
