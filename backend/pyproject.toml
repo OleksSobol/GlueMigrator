@@ -10,4 +10,11 @@ dependencies = [
     "httpx>=0.28",
     "pydantic-settings>=2.0",
     "python-dotenv>=1.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "cryptography>=42.0"
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

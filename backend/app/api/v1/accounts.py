@@ -47,3 +47,15 @@ async def list_documents(org_id: str, body: ProbeRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/org/{org_id}/documents/{doc_id}")
+async def get_document(org_id: str, doc_id: str, body: ProbeRequest):
+    """Fetch full document with sections and attachments."""
+    client = ITGlueClient(
+        api_key=body.api_key,
+        base_url=body.base_url or settings.itglue_base_url
+    )
+    try:
+        return await client.get_document(org_id, doc_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
