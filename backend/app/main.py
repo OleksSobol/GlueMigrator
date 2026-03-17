@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import health, accounts, migrations, credentials
+from app.api.v1 import health, accounts, migrations, credentials, jobs
 from app.db.database import engine, Base
 import app.db.models  # noqa: F401
 
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(accounts.router, prefix="/api/v1")
     app.include_router(migrations.router, prefix="/api/v1")
     app.include_router(credentials.router, prefix="/api/v1")
+    app.include_router(jobs.router, prefix="/api/v1")
 
     return app
 
