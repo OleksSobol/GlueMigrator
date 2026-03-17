@@ -133,11 +133,19 @@ class ITGlueClient:
         items = await self._paginate(f"/organizations/{org_id}/relationships/contacts")
         return [self._parse_contact(i) for i in items]
 
+    async def create_contact(self, org_id: str, payload: dict) -> dict:
+        data = await self._request("POST", f"/organizations/{org_id}/relationships/contacts", payload=payload)
+        return data.get("data", {})
+
     # --- Locations ---
 
     async def get_locations(self, org_id: str) -> list[dict]:
         items = await self._paginate(f"/organizations/{org_id}/relationships/locations")
         return [self._parse_location(i) for i in items]
+
+    async def create_location(self, org_id: str, payload: dict) -> dict:
+        data = await self._request("POST", f"/organizations/{org_id}/relationships/locations", payload=payload)
+        return data.get("data", {})
 
     # --- Attachments (universal) ---
 

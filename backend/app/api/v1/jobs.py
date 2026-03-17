@@ -1,7 +1,9 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.db.database import get_session
 from app.db import crud
+from app.services.migration_engine import run_migration
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -70,3 +72,18 @@ async def delete_job(job_id: str):
         if not deleted:
             raise HTTPException(status_code=404, detail="Job not found")
         return {"deleted": True}
+
+
+@router.post("/{job_id}/start")
+async def start_job(job_id: str):
+    async with get_session() as db:
+        obj = await crud.get_job(db, job_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if obj.status not in ("pending", "failed"):
+            raise HTTPException(status_code=400, detail=f"Job cannot be started from status '{obj.status}'")
+        obj.status = "queued"
+        await db.commit()
+
+    asyncio.create_task(run_migration(job_id))
+    return {"status": "queued"}
