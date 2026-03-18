@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.core.encryption import encrypt
+from app.core.encryption import encrypt, decrypt
 from app.db.database import get_session
 from app.db import crud
+from app.services.itglue_client import ITGlueClient
 
 router = APIRouter(prefix="/credentials", tags=["credentials"])
 
@@ -62,3 +63,23 @@ async def delete_credential(credential_id: str):
         if not deleted:
             raise HTTPException(status_code=404, detail="Credential not found")
         return {"deleted": True}
+
+
+@router.get("/{credential_id}/organizations")
+async def list_organizations(credential_id: str, side: str = "source"):
+    """Fetch orgs for source or dest side of a credential."""
+    async with get_session() as db:
+        obj = await crud.get_credential(db, credential_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Credential not found")
+
+    if side == "dest":
+        client = ITGlueClient(api_key=decrypt(obj.dest_api_key_enc), base_url=obj.dest_base_url)
+    else:
+        client = ITGlueClient(api_key=decrypt(obj.source_api_key_enc), base_url=obj.source_base_url)
+
+    try:
+        orgs = await client.get_organizations()
+        return orgs
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -14,6 +14,14 @@ class Base(DeclarativeBase):
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add columns introduced after initial schema (no-op if already present)
+        from sqlalchemy import text
+        try:
+            await conn.execute(text(
+                "ALTER TABLE migration_job_items ADD COLUMN error_message TEXT"
+            ))
+        except Exception:
+            pass  # column already exists
 
 
 @asynccontextmanager

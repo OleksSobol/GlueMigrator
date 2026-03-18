@@ -60,9 +60,15 @@ async def run_migration(job_id: str):
 
         # Migrate each item
         for item_type, resource in all_items:
+            await db.refresh(job)
+            if job.status == "cancelled":
+                return
             await _migrate_item(db, job, item_type, resource, source_client, dest_client)
 
         # Set final status
+        await db.refresh(job)
+        if job.status == "cancelled":
+            return
         if job.failed_items == 0:
             job.status = "completed"
         elif job.completed_items == 0:
@@ -164,6 +170,7 @@ async def _migrate_item(db, job, item_type, resource, source_client, dest_client
 
     except Exception as e:
         item.status = "failed"
+        item.error_message = str(e)
         item.retry_count += 1
         job.failed_items += 1
         job.error_message = str(e)

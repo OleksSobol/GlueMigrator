@@ -80,6 +80,7 @@ class MigrationJobItem(Base):
     dest_resource_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="pending")
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class MappingConfig(Base):

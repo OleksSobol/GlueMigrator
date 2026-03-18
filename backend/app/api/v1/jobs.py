@@ -93,6 +93,41 @@ async def start_job(job_id: str):
     return {"status": "queued"}
 
 
+@router.post("/{job_id}/cancel")
+async def cancel_job(job_id: str):
+    async with get_session() as db:
+        obj = await crud.get_job(db, job_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if obj.status not in ("pending", "queued", "running"):
+            raise HTTPException(status_code=400, detail=f"Job cannot be cancelled from status '{obj.status}'")
+        obj.status = "cancelled"
+        await db.commit()
+    return {"status": "cancelled"}
+
+
+@router.get("/{job_id}/items")
+async def list_job_items(job_id: str):
+    async with get_session() as db:
+        job = await crud.get_job(db, job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        items = await crud.list_job_items(db, job_id)
+        return [
+            {
+                "id": i.id,
+                "item_type": i.item_type,
+                "source_resource_name": i.source_resource_name,
+                "source_resource_id": i.source_resource_id,
+                "dest_resource_id": i.dest_resource_id,
+                "status": i.status,
+                "retry_count": i.retry_count,
+                "error_message": i.error_message,
+            }
+            for i in items
+        ]
+
+
 @router.get("/{job_id}/asset-type-map")
 async def get_asset_type_map(job_id: str):
     async with get_session() as db:
